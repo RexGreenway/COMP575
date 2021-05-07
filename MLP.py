@@ -391,7 +391,7 @@ def generate_training_data(training_size, dimension, center_range, radius):
 
 
 
-######### MAIN FUNCTION ##########
+######### SELECTION FUNC. ##########
 
 def main(method, data, iterations, hidden_layers, activation_method):
 
