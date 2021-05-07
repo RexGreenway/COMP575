@@ -93,7 +93,7 @@ class MLP():
 
         Returns
         -------
-        activations : NumPy Array (1 x num_ouput)
+        activations : NumPy Array (1 x num_output)
             Final Activation values for each node in output layer.
         """
         # Input Layer
@@ -116,9 +116,8 @@ class MLP():
         """
         # Iterate back through each layer in the network.
         for i in reversed(range(len(self.derivatives))):
-            # Activation for previous layer
+            # Activations for previous and current layer
             activations = self.activations[i+1]
-            # Activation for current layer
             current_activations = self.activations[i]
 
             # Output Layer : delta = total_Error * a_prime(net_input)
@@ -132,41 +131,8 @@ class MLP():
             # dE/dW = delta * activations
             self.derivatives[i] = np.dot(current_activations, delta_re)
 
-            # Change error for hidden layers (see above comment)
+            # Change error for hidden layers (see above 'Input Layer' comment)
             error = np.dot(delta, self.weights[i].T)
-
-    def fit(self, inputs, targets, epochs, learning_rate):
-        """
-        Train the neural network using forward- and back-propagation on given
-        training inputs and targets.
-        """
-        # Store epoch errors for plotting
-        self.errors = np.zeros(epochs)
-
-        # Iterate through epochs
-        for i in range(epochs):
-            # Error for current epoch
-            sum_errors = 0
-
-            # Iterate through training inputs
-            for j, input in enumerate(inputs):
-                # Get Output (forward pass), Target,  and thus error:
-                target = targets[j]
-                output = self.forward_propagate(input)
-                error = target - output
-
-                # Back-prop. updates derivatives + Update Weights
-                self.back_propagate(error)
-                self._gradient_descent(learning_rate)
-
-                sum_errors += self._mse(target, output)
-
-            self.errors[i] = sum_errors
-
-            # Print iteration tracking to console
-            if i % min(100, int(epochs / 10)) == 0:
-                print(f"Iteration: {i}\nCurrent Error {sum_errors/len(inputs)}")
-        print(f"\nFinal Error: {sum_errors/len(inputs)}")
 
     def _gradient_descent(self, learningRate=1):
         """
@@ -178,6 +144,38 @@ class MLP():
             weights = self.weights[i]
             derivatives = self.derivatives[i]
             weights += derivatives * learningRate
+
+    def fit(self, inputs, targets, epochs, learning_rate):
+        """
+        Train the neural network using forward- and back-propagation on given
+        training inputs and targets.
+        """
+        # Store epoch errors for plotting
+        self.errors = np.zeros(epochs)
+
+        for i in range(epochs):
+            # Error for current epoch
+            sum_errors = 0
+
+            for j, input in enumerate(inputs):
+                # Get Output (forward pass), Target,  and thus error:
+                target = targets[j]
+                output = self.forward_propagate(input)
+                error = target - output
+
+                # Back-prop. updates derivatives + Update Weights
+                self.back_propagate(error)
+                self._gradient_descent(learning_rate)
+
+                # Error Tracking
+                sum_errors += self._mse(target, output)
+            self.errors[i] = sum_errors
+
+            # Print iteration tracking to console
+            if i % min(100, int(epochs / 10)) == 0:
+                print(f"Iteration: {i}\nCurrent Error {sum_errors/len(inputs)}")
+
+        print(f"\nFinal Error: {sum_errors/len(inputs)}")
 
     ## ACTIVATION FUNCTION SELECTOR ##
     def activate(self, x):
@@ -228,7 +226,8 @@ class MLP():
 
 ############## UPDATE FUNCTIONS (BackProp., GA, PSO) ##################
 
-def nn_update(mlp_structure, train_x, train_y):
+## BACKPROP ##
+def nn_update(mlp_structure, train_x, train_y, iterations, activation_method):
     """
     Trains a multi-layer perceptron neural network using backpropagation to
     update weights and learn given training data.     
@@ -238,9 +237,9 @@ def nn_update(mlp_structure, train_x, train_y):
     num_hidden = [i for i in mlp_structure[1:-1]]
     num_ouputs = mlp_structure[-1]
     # create a Multilayer Perceptron with one hidden layer
-    mlp = MLP(num_inputs, num_hidden, num_ouputs, activation_method="tanh")
+    mlp = MLP(num_inputs, num_hidden, num_ouputs, activation_method=activation_method)
     # train network
-    mlp.fit(train_x, train_y, 1000, 0.1)
+    mlp.fit(train_x, train_y, iterations, 0.1)
     # plot
     plt.plot(mlp.errors / len(train_x))
     plt.xlabel("Iterations")
@@ -248,7 +247,18 @@ def nn_update(mlp_structure, train_x, train_y):
     plt.show()
     return mlp
 
-def ga_update(mlp_structure, train_x, train_y):
+## GET ENCODED VECTOR SIZE ##
+def get_n_genes(nn_structure):
+    """
+    Returns
+    """
+    sol_shape = 0
+    for i in range(len(nn_structure) - 1):
+        sol_shape += nn_structure[i] * nn_structure[i + 1]
+    return sol_shape
+
+## GA ##
+def ga_update(mlp_structure, train_x, train_y, iterations):
     """
     Performs Genetic Algorithm Optimisation to train neural network weights to
     learn given training data.     
@@ -259,13 +269,6 @@ def ga_update(mlp_structure, train_x, train_y):
     num_inputs = mlp_structure[0]
     num_hidden = [i for i in mlp_structure[1:-1]]
     num_ouputs = mlp_structure[-1]
-
-    # SUB FUNCTIONS
-    def get_n_genes(nn_structure):
-        sol_shape = 0
-        for i in range(len(mlp_structure) - 1):
-            sol_shape += mlp_structure[i] * mlp_structure[i + 1]
-        return sol_shape
 
     def fitness(X):
         # create mlp with weights
@@ -281,7 +284,7 @@ def ga_update(mlp_structure, train_x, train_y):
         n_genes=n_genes, 
         fitness_function=fitness,
         pop_size=50,
-        max_gen=1000,
+        max_gen=iterations,
         mutation_rate=0.01,         
         selection_rate=0.1,         
         selection_strategy="roulette_wheel",
@@ -295,7 +298,8 @@ def ga_update(mlp_structure, train_x, train_y):
     mlp = MLP(num_inputs, num_hidden, num_ouputs, weights = sol)
     return mlp
 
-def pso_update(mlp_structure, train_x, train_y):
+## PSO ##
+def pso_update(mlp_structure, train_x, train_y, iterations):
     """
     Performs Particle Swarm Optimisation to train neural network weights to
     learn given training data.     
@@ -307,12 +311,6 @@ def pso_update(mlp_structure, train_x, train_y):
     num_inputs = mlp_structure[0]
     num_hidden = [i for i in mlp_structure[1:-1]]
     num_ouputs = mlp_structure[-1]
-
-    def get_n_genes(nn_structure):
-        sol_shape = 0
-        for i in range(len(mlp_structure) - 1):
-            sol_shape += mlp_structure[i] * mlp_structure[i + 1]
-        return sol_shape
 
     def fitness(X):
         # create mlp with weights
@@ -342,7 +340,7 @@ def pso_update(mlp_structure, train_x, train_y):
         bounds=bounds,
         oh_strategy=oh_strategy
         )
-    cost, pos = optimizer.optimize(f, iters=1000)
+    cost, pos = optimizer.optimize(f, iters=iterations)
     plot_cost_history(cost_history=optimizer.cost_history)
     plt.show()
 
@@ -367,9 +365,7 @@ def get_rand_points_on_sphere(num_points, center, r):
         x = r * np.cos(phi) * np.sin(theta) + center[0]
         y = r * np.sin(phi) * np.sin(theta) + center[1]
         z = r * np.cos(theta) + center[2]
-        sphere[i, 0] = x
-        sphere[i, 1] = y
-        sphere[i, 2] = z
+        sphere[i, 0], sphere[i, 1], sphere[i, 2] = x, y, z
     return sphere
 
 def generate_training_data(training_size, dimension, center_range, radius):
@@ -391,75 +387,79 @@ def generate_training_data(training_size, dimension, center_range, radius):
         sphere = get_rand_points_on_sphere(dimension, center, radius)
         flat_sphere = sphere.flatten()
         train_x = np.vstack((train_x, flat_sphere))
-
     return train_x, train_y
 
 
 
 ######### MAIN FUNCTION ##########
 
-def main(method, mlp_structure, data):
-    # TRAIN
+def main(method, data, iterations, hidden_layers, activation_method):
+
+    # DATA Selection
     if data == "sphere":
+        # Dataset Parameters
         training_size = 1000
         sphere_points = 30
         center_range = (0, 2)
         radius = 1
-        train_x, train_y = generate_training_data(training_size, sphere_points, center_range, radius)
 
-        # # PLOT FIRST SPHERE FOR SHOW
-        # import matplotlib.pyplot as plt
-        # test = train_x[0]
-        # target = train_y[0]
-        # fig = plt.figure()
-        # ax = fig.add_subplot(projection='3d')
-        # ax.scatter(test[0:sphere_points*3:3], test[1:sphere_points*3:3], test[2:sphere_points*3:3], marker="o")
-        # ax.scatter(target[0], target[1], target[2], marker="^")
-        # plt.show()
-    
-    else:
-        # VECTOR SUM TRAINING
+        # Training Set
+        train_x, train_y = generate_training_data(training_size, sphere_points, center_range, radius)
+        # Testing Set
+        y = np.random.randint(center_range[0], center_range[1], size=3)
+        X = get_rand_points_on_sphere(sphere_points, y, radius)
+
+        mlp_structure = [sphere_points * 3]
+        for i in hidden_layers:
+            mlp_structure.append(i)
+        mlp_structure.append(3)
+
+    elif data == "vector_add":
+        # Training Set
         train_x = np.array([[np.random.random()/2 for _ in range(4)] for _ in range(1000)])
         train_y = np.array([[i[0] + i[2], i[1] + i[3]] for i in train_x])
+        # Testing Set
+        X = np.array([0.3, 0.1, 0.2, 0.1])
+        y = np.array([0.5, 0.2])
 
-    # METHOD SELECTOR
+        mlp_structure = [4]
+        for i in hidden_layers:
+            mlp_structure.append(i)
+        mlp_structure.append(2)
+
+    else:
+        print("NO SUCH DATA")
+
+    # TRAINING
     if method == "nn":
-        return nn_update(mlp_structure, train_x, train_y)
+        mlp = nn_update(mlp_structure, train_x, train_y, iterations, activation_method)
     elif method == "ga":
-        return ga_update(mlp_structure, train_x, train_y)
+        mlp = ga_update(mlp_structure, train_x, train_y, iterations)
     elif method == "pso":
-        return pso_update(mlp_structure, train_x, train_y)
+        mlp = pso_update(mlp_structure, train_x, train_y, iterations)
     else:
         print("NO SUCH UPDATE RULE")
 
-
-if __name__ == "__main__":
-    # METHOD + DATA
-    method = "pso"
-    data = "sphere"
-
-    # MLP Structure (Dependent on data)
-    if data == "sphere":
-        sphere_points = 30
-        center_range = (0, 2)
-        radius = 1
-        mlp_structure = [sphere_points * 3, 32, 3]
-    else:
-        mlp_structure = [4, 5, 2]
-        
-    # TRAINING
-    mlp = main(method, mlp_structure, data)
-
-    # TEST
-    if data == "sphere":
-        y = np.random.randint(center_range[0], center_range[1], size=3)
-        X = get_rand_points_on_sphere(sphere_points, y, radius)
-    else:
-        # VECTOR SUM TEST
-        X = np.array([0.3, 0.1, 0.2, 0.1])
-        y = np.array([0.5, 0.2])
-    
     # SINGLE RANDOM TEST
     output = mlp.forward_propagate(X.flatten())
     print(f"\n\tEXPECTED: {y} --> PREDICTED: {np.round_(output, 5)}")
+
+
+
+########## MAIN FUNC. ##################
+
+if __name__ == "__main__":
+    
+    # METHOD ('nn', 'ga', or 'pso')
+    method = "nn"
+    # DATA ('vector_add' or 'sphere')
+    data = "sphere"
+
+    # HYPERPARAMETERS
+    iterations = 1000
+    hidden_layers = [32]
+    activation_method = "sigmoid"
+
+    # RUN MAIN FUNC.
+    main(method, data, iterations, hidden_layers, activation_method)
     

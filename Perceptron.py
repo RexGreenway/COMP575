@@ -5,12 +5,14 @@ By Thomas Rex Greenway 201198319
 
 Implementation of a simple Perceptron.
 """
+
 # IMPORTS
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-# Perceptron Class
+######### Perceptron Class ##############
+
 class Perceptron():
     """
     Perceptron Class.
@@ -57,50 +59,45 @@ class Perceptron():
         if len(self.w) == 0:
             print("PLEASE TRAIN NETWORK FIRST")
             return
-        # Add adition input for bias term.
+        # Add additional input for bias term.
         X = np.insert(X, 0, [1], axis = 1)
         return np.where(np.dot(X, self.w[:]) >= 0.0, 1, -1)
 
+
+
+############### GET DATA ################
 
 def iris_data(epochs = 10, eta = 0.1):
     # Get Iris Dataset (Only first two classes / 100 data points: Iris-setosa and Iris-versicolor)
     f = "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data"
     convertFunc = lambda name: 1. if name == b"Iris-setosa" else (-1 if name == b"Iris-versicolor" else 3.)
-    sorted_data = np.genfromtxt(f, delimiter=",", converters={-1 : convertFunc})
-    sorted_data = sorted_data[:100]
-    # Remove first value (for 3d plot purposes)
+    sorted_data = np.genfromtxt(f, delimiter=",", converters={-1 : convertFunc})[:100]
+    # Remove first value (for 3d plot purposes) + Permute Dataset
     sorted_data = np.delete(sorted_data, 0, 1)
-    # Permute Dataset
-    rng = np.random.default_rng()
-    data = rng.permutation(sorted_data)
+    data = np.random.default_rng().permutation(sorted_data)
 
-    # Sperate input and targets, and delete first col of inputs (for 3D plotting)
+    # Sperate input and targets
     X = data[:, :-1]
     y = data[:, -1]
 
-    # Create Perceptron
+    # Create Perceptron + TRAIN
     p = Perceptron(eta)
-
-    # TRAINING
     p.fit(X, y, epochs)
 
     # PLOTTING
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     w = p.w
-    xx = np.arange(1, 5, 0.25)
-    yy = np.arange(1, 5, 0.25)
+    xx, yy = np.arange(1, 5, 0.25), np.arange(1, 5, 0.25)
     xx, yy = np.meshgrid(xx, yy)
-    zz = (- w[0] - (w[1] * xx) + (w[1] * yy)) / w[3]
-    # Clip Z values for clarity in plot
-    zz = np.clip(zz, 0, 2)
+    zz = (- w[0] - (w[1] * xx) + (w[1] * yy)) / w[3]                 
+    zz = np.clip(zz, 0, 2)          # Clip Z values for clarity in plot
 
     # Plot Decsiion Boundary
     ax.plot_surface(xx, yy, zz, alpha = 0.5, color = "k")
     # Scatter plot of data points
     ax.scatter(sorted_data[:50, 0], sorted_data[:50, 1], sorted_data[:50, 2], marker="o", label="Setosa")
     ax.scatter(sorted_data[50:100, 0], sorted_data[50:100, 1], sorted_data[50:100, 2], marker="^", label="Versicolor")
-    
     ax.set_zbound(0, 2)
     ax.legend()
     plt.show()
@@ -123,15 +120,18 @@ def wheat_data(epochs, eta):
     print(f"{len(test_y) - np.count_nonzero(p.predict(test_x) - test_y)} out of {len(test_y)}")
 
 
+########### MAIN FUNCTION ############
+
 if __name__ == "__main__":
     # Hyperpararmeters
     epochs = 1000
     eta = 0.5
     
-    # True ==> Iris data set and boundary plot.
-    visual_data = False
+    # True ==> TRAIN PERCEPTRON ON IRIS DATASET AND VISUALISE
+    # False ==> TRAIN PERCEPTRON ON WHEAT SEEDS DATAET AND TEST
+    iris = True
 
-    if visual_data:
+    if iris:
         iris_data(epochs, eta)
     else:
         wheat_data(epochs, eta)

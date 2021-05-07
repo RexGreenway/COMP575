@@ -3,4 +3,5 @@ report.log
 temp.py
 new.py
 /venv
-/vscode
+/.vscode
+/archive.ics.uci.edu
